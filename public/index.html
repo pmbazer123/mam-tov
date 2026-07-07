@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ממ-טוב | חיפוש ממים AI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f17;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      direction: rtl;
+    }
+
+    header {
+      text-align: center;
+      padding: 40px 16px 24px;
+    }
+
+    .logo {
+      font-size: 2.8rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -1px;
+      margin-bottom: 6px;
+    }
+
+    .tagline { color: #9ca3af; font-size: 0.95rem; }
+
+    .search-box {
+      max-width: 640px;
+      margin: 0 auto 24px;
+      padding: 0 16px;
+    }
+
+    .search-row { display: flex; gap: 8px; }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 2px solid #27273a;
+      background: #1a1a2e;
+      color: #fff;
+      font-size: 1rem;
+      direction: rtl;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus { border-color: #f59e0b; }
+    input::placeholder { color: #6b7280; }
+
+    button#searchBtn {
+      padding: 14px 24px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+
+    button#searchBtn:hover { opacity: 0.9; }
+    button#searchBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .examples {
+      text-align: center;
+      color: #6b7280;
+      font-size: 0.82rem;
+      margin-top: 10px;
+    }
+
+    .examples span {
+      cursor: pointer;
+      color: #9ca3af;
+      text-decoration: underline;
+      margin: 0 5px;
+    }
+
+    .examples span:hover { color: #f59e0b; }
+
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 1.5px solid #27273a;
+      background: transparent;
+      color: #9ca3af;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, #f59e0b22, #ef444422);
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+
+    .tab-btn:hover:not(.active) { border-color: #444; color: #ddd; }
+
+    #status {
+      text-align: center;
+      color: #9ca3af;
+      min-height: 20px;
+      margin-bottom: 10px;
+      font-size: 0.88rem;
+    }
+
+    .spinner {
+      display: none;
+      margin: 30px auto;
+      width: 36px;
+      height: 36px;
+      border: 3px solid #27273a;
+      border-top-color: #f59e0b;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 16px 60px;
+    }
+
+    .meme-card {
+      background: #1a1a2e;
+      border: 1px solid #27273a;
+      border-radius: 14px;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .meme-card:hover { transform: translateY(-3px); border-color: #f59e0b44; }
+
+    .meme-card img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      display: block;
+    }
+
+    .meme-info { padding: 10px 12px; }
+
+    .meme-name {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      direction: ltr;
+      text-align: left;
+    }
+
+    .use-btn {
+      display: block;
+      width: 100%;
+      padding: 9px;
+      text-align: center;
+      background: linear-gradient(135deg, #f59e0b22, #ef444422);
+      border: 1px solid #f59e0b66;
+      border-radius: 8px;
+      color: #f59e0b;
+      font-weight: 700;
+      font-size: 0.88rem;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .use-btn:hover { background: linear-gradient(135deg, #f59e0b44, #ef444444); }
+
+    .israeli-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 16px 60px;
+    }
+
+    .israeli-card {
+      background: #1a1a2e;
+      border: 1px solid #27273a;
+      border-radius: 14px;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+      cursor: pointer;
+    }
+
+    .israeli-card:hover { transform: translateY(-3px); border-color: #3b82f644; }
+
+    .israeli-card img {
+      width: 100%;
+      max-height: 200px;
+      object-fit: cover;
+      display: block;
+      background: #111;
+    }
+
+    .israeli-info { padding: 10px 12px; }
+
+    .israeli-title {
+      font-size: 0.82rem;
+      color: #d1d5db;
+      margin-bottom: 6px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .israeli-source { font-size: 0.73rem; color: #6b7280; margin-bottom: 6px; }
+
+    .src-btn {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      text-align: center;
+      background: #1e3a5f22;
+      border: 1px solid #3b82f644;
+      border-radius: 8px;
+      color: #60a5fa;
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .src-btn:hover { background: #1e3a5f44; }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #374151;
+      font-size: 0.78rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">ממ-טוב 🔥</div>
+    <p class="tagline">תאר מה קרה — נמצא לך את הממ המושלם</p>
+  </header>
+
+  <div class="search-box">
+    <div class="search-row">
+      <input type="text" id="queryInput" placeholder="למשל: הבוס הגיע לפגישה שכחנו...">
+      <button id="searchBtn" onclick="doSearch()">חפש ממ</button>
+    </div>
+    <div class="examples">
+      נסה:
+      <span onclick="fillAndSearch('הבוס הגיע לפגישה שכחנו לכין')">הבוס לפגישה</span>
+      <span onclick="fillAndSearch('שלחתי מייל טעות לכל החברה')">מייל לכולם</span>
+      <span onclick="fillAndSearch('כולם מסכימים בישיבה אבל אחרי מתלוננים')">ישיבה מסכימים</span>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs" style="display:none">
+    <button class="tab-btn active" id="tab-intl" onclick="showTab('intl')">🌍 תבניות בינלאומיות</button>
+    <button class="tab-btn" id="tab-il" onclick="showTab('il')">🇮🇱 ממים ישראלים</button>
+  </div>
+
+  <div id="status"></div>
+  <div class="spinner" id="spinner"></div>
+
+  <div id="panel-intl">
+    <div class="results-grid" id="results-templates"></div>
+  </div>
+
+  <div id="panel-il" style="display:none">
+    <div class="israeli-grid" id="results-israeli"></div>
+  </div>
+
+  <footer>ממ-טוב · מנוע חיפוש ממים AI בעברית</footer>
+
+  <script>
+    const input = document.getElementById('queryInput');
+    const btn = document.getElementById('searchBtn');
+    const spinner = document.getElementById('spinner');
+    const statusEl = document.getElementById('status');
+    const tabs = document.getElementById('tabs');
+
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+    function fillAndSearch(text) { input.value = text; doSearch(); }
+
+    function showTab(tab) {
+      document.getElementById('tab-intl').classList.toggle('active', tab === 'intl');
+      document.getElementById('tab-il').classList.toggle('active', tab === 'il');
+      document.getElementById('panel-intl').style.display = tab === 'intl' ? '' : 'none';
+      document.getElementById('panel-il').style.display = tab === 'il' ? '' : 'none';
+    }
+
+    async function doSearch() {
+      const query = input.value.trim();
+      if (!query) return;
+
+      btn.disabled = true;
+      spinner.style.display = 'block';
+      statusEl.textContent = 'מחפש...';
+      document.getElementById('results-templates').innerHTML = '';
+      document.getElementById('results-israeli').innerHTML = '';
+      tabs.style.display = 'none';
+
+      const [templatesRes, israeliRes] = await Promise.allSettled([
+        postJSON('/search/templates', { query }),
+        postJSON('/search/israeli', { query })
+      ]);
+
+      spinner.style.display = 'none';
+      btn.disabled = false;
+
+      const templates = templatesRes.status === 'fulfilled' && !templatesRes.value?.error
+        ? templatesRes.value.results : [];
+      const israeli = israeliRes.status === 'fulfilled' && !israeliRes.value?.error
+        ? israeliRes.value.results : [];
+
+      if (!templates.length && !israeli.length) {
+        statusEl.textContent = 'לא נמצאו תוצאות. נסה ניסוח אחר.';
+        return;
+      }
+
+      statusEl.textContent = '';
+      tabs.style.display = '';
+
+      if (templates.length) renderTemplates(templates);
+      if (israeli.length) renderIsraeli(israeli);
+
+      showTab(templates.length ? 'intl' : 'il');
+    }
+
+    async function postJSON(url, body) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      return res.json();
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderTemplates(results) {
+      document.getElementById('results-templates').innerHTML = results.map(m => `
+        <div class="meme-card">
+          <img src="${esc(m.url)}" alt="${esc(m.name)}" loading="lazy">
+          <div class="meme-info">
+            <div class="meme-name">${esc(m.name)}</div>
+            <a class="use-btn" href="${esc(m.imgflipUrl)}" target="_blank" rel="noopener">
+              השתמש בתבנית זו →
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderIsraeli(results) {
+      document.getElementById('results-israeli').innerHTML = results.map(r => `
+        <div class="israeli-card" onclick="window.open('${esc(r.sourceUrl)}','_blank')">
+          <img src="${esc(r.thumbnail)}" alt="${esc(r.title)}" loading="lazy"
+               onerror="this.src='${esc(r.imageUrl)}'; this.onerror=null;">
+          <div class="israeli-info">
+            <div class="israeli-title">${esc(r.title)}</div>
+            <div class="israeli-source">${esc(r.source || '')}</div>
+            <a class="src-btn" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener"
+               onclick="event.stopPropagation()">
+              פתח מקור →
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
