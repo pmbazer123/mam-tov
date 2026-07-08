@@ -5,35 +5,12 @@ const fs = require('fs');
 const app = express();
 const PORT = 19300;
 
-function loadConfig() {
-  const cfg = JSON.parse(fs.readFileSync('/home/moshe-assistant/.openclaw/openclaw.json', 'utf8'));
-  return {
-    googleKey: cfg.plugins.entries.google.config.webSearch.apiKey,
-    braveKey: cfg.gateway?.auth?.token
-      ? null // gateway token isn't Brave key
-      : null,
-  };
-}
-
-// Load keys directly
 function getKeys() {
-  try {
-    const cfg = JSON.parse(fs.readFileSync('/home/moshe-assistant/.openclaw/openclaw.json', 'utf8'));
-    const googleKey = cfg.plugins.entries.google.config.webSearch.apiKey;
-    // Brave key is in gateway env file
-    let braveKey = null;
-    try {
-      const env = fs.readFileSync('/home/moshe-assistant/.openclaw/gateway.systemd.env', 'utf8');
-      const m = env.match(/BRAVE_API_KEY=(.+)/);
-      if (m) braveKey = m[1].trim();
-    } catch {}
-    return { googleKey, braveKey };
-  } catch (e) {
-    throw new Error('Failed to load config: ' + e.message);
-  }
+  const cfg = JSON.parse(fs.readFileSync('/home/moshe-assistant/.openclaw/openclaw.json', 'utf8'));
+  return { googleKey: cfg.plugins.entries.google.config.webSearch.apiKey };
 }
 
-const { googleKey, braveKey } = getKeys();
+const { googleKey } = getKeys();
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleKey}`;
 
 app.use(express.json());
@@ -52,13 +29,17 @@ async function getMemes() {
   return memesCache;
 }
 
-async function askGemini(prompt) {
+async function askGemini(prompt, maxTokens = 200) {
   const res = await fetch(GEMINI_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 200, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } }
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.5,
+        thinkingConfig: { thinkingBudget: 0 }
+      }
     })
   });
   const data = await res.json();
@@ -100,54 +81,65 @@ Format: [4, 17, 23, 56, 71, 88] — only the array, nothing else.`;
   }
 });
 
-// Israeli memes via Brave Image Search
+// Israeli meme IDEAS: Gemini generates Hebrew captions for relevant templates
 app.post('/search/israeli', async (req, res) => {
   const { query } = req.body;
   if (!query || query.trim().length < 2) return res.status(400).json({ error: 'Query too short' });
-  if (!braveKey) return res.status(503).json({ error: 'Image search not configured' });
 
   try {
-    // Use Gemini to extract 2-3 punchy Hebrew keywords for the image search
-    const kwPrompt = `Situation (Hebrew): "${query}"
-Extract 2-3 key Hebrew words that capture the emotional/comedic core of this situation.
-These words will be used to search for Israeli memes.
-Return only the words separated by spaces, no punctuation.
-Example input: "הבוס הגיע לפגישה שכחנו לכין"
-Example output: בוס פגישה בושה`;
+    const memes = await getMemes();
+    const memeList = memes.map((m, i) => `${i}: ${m.name} (boxes: ${m.box_count || 2})`).join('\n');
 
-    const keywords = await askGemini(kwPrompt);
-    const searchQuery = encodeURIComponent(`${keywords.trim()} ממ מצחיק ישראלי`);
+    const prompt = `You are an expert in Israeli meme culture and Hebrew internet humor.
 
-    const braveRes = await fetch(
-      `https://api.search.brave.com/res/v1/images/search?q=${searchQuery}&count=9&safesearch=strict`,
-      {
-        headers: {
-          'Accept': 'application/json',
-          'X-Subscription-Token': braveKey
-        }
-      }
-    );
-    const data = await braveRes.json();
-    if (data.errors) return res.status(500).json({ error: data.errors[0]?.message || 'Brave error' });
+User situation (Hebrew): "${query}"
 
-    const results = (data.results || [])
-      .filter(r => r.properties?.url)
-      .map(r => ({
-        title: r.title,
-        imageUrl: r.properties.url,
-        thumbnail: r.thumbnail?.src || r.properties.url,
-        sourceUrl: r.url,
-        source: r.meta_url?.hostname || r.source
-      }));
+Meme templates available (index: name, boxes=number of text fields):
+${memeList}
 
-    res.json({ results, keywords: keywords.trim() });
+Create 4 specific Israeli-flavored meme ideas. For each:
+1. Pick the best template index
+2. Write HEBREW text for each text box (short, punchy, authentic Israeli style — slang ok)
+3. One-word "vibe" in Hebrew
+
+Return ONLY valid JSON (no markdown):
+[
+  {"idx": 3, "texts": ["טקסט לתיבה 1", "טקסט לתיבה 2"], "vibe": "בייגל"},
+  ...
+]
+
+Rules:
+- Texts must be in Hebrew
+- Keep each text under 8 words
+- Israeli references, slang, and cultural context preferred
+- Only the JSON array, nothing else`;
+
+    const raw = await askGemini(prompt, 600);
+    const clean = raw.replace(/```[a-z]*/g, '').replace(/```/g, '').trim();
+    const jsonMatch = clean.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return res.status(500).json({ error: 'Parse error' });
+
+    const ideas = JSON.parse(jsonMatch[0]);
+    const results = ideas.map(idea => {
+      const meme = memes[idea.idx];
+      if (!meme) return null;
+      return {
+        id: meme.id,
+        name: meme.name,
+        url: meme.url,
+        imgflipUrl: `https://imgflip.com/memegenerator/${meme.id}`,
+        texts: idea.texts || [],
+        vibe: idea.vibe || ''
+      };
+    }).filter(Boolean);
+
+    res.json({ results });
   } catch (err) {
     console.error('israeli error:', err.message);
-    res.status(500).json({ error: 'Search failed' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Keep backward-compat /search endpoint
 app.post('/search', async (req, res) => {
   req.url = '/search/templates';
   app._router.handle(req, res);
