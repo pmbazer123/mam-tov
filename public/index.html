@@ -392,8 +392,9 @@
           <img src="${esc(m.url)}" alt="${esc(m.name)}" loading="lazy">
           <div class="meme-info">
             <div class="meme-name">${esc(m.name)}</div>
+            ${m.context ? `<div style="font-size:0.78rem;color:#9ca3af;margin-bottom:8px;line-height:1.4">${esc(m.context)}</div>` : ''}
             <a class="use-btn" href="${esc(m.imgflipUrl)}" target="_blank" rel="noopener">
-              השתמש בתבנית זו →
+              צור ממ זה →
             </a>
           </div>
         </div>

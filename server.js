@@ -10,6 +10,12 @@ function getKeys() {
   return { googleKey: cfg.plugins.entries.google.config.webSearch.apiKey };
 }
 
+// Load meme context (name → Hebrew use-case description)
+let memeContext = {};
+try {
+  memeContext = JSON.parse(fs.readFileSync(path.join(__dirname, 'meme-context.json'), 'utf8'));
+} catch {}
+
 const { googleKey } = getKeys();
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleKey}`;
 
@@ -55,15 +61,25 @@ app.post('/search/templates', async (req, res) => {
 
   try {
     const memes = await getMemes();
-    const memeList = memes.map((m, i) => `${i}: ${m.name}`).join('\n');
-    const prompt = `User situation (Hebrew): "${query}"
+    const memeList = memes.map((m, i) => {
+      const ctx = memeContext[m.name];
+      return ctx ? `${i}: ${m.name} — ${ctx}` : `${i}: ${m.name}`;
+    }).join('\n');
 
-Meme templates (index: name):
+    const prompt = `You are an expert in meme culture.
+
+User situation (in Hebrew): "${query}"
+
+Meme templates (index: name — use case in Hebrew):
 ${memeList}
 
-Return ONLY a JSON array of 6 index numbers for the most fitting meme templates.
-Think: emotion, irony, power dynamics, universal humor.
-Format: [4, 17, 23, 56, 71, 88] — only the array, nothing else.`;
+Choose the 6 BEST matching templates. Match by:
+- Emotional tone (panic, embarrassment, irony, etc.)
+- Power dynamic (boss/employee, self vs inner voice, etc.)
+- The specific comedic angle of the situation
+
+Return ONLY a JSON array of 6 indices. Example: [4, 17, 23, 56, 71, 88]
+Nothing else — just the array.`;
 
     const text = await askGemini(prompt);
     const match = text.replace(/```[a-z]*/g, '').match(/\[[\d,\s]+\]/);
@@ -72,7 +88,8 @@ Format: [4, 17, 23, 56, 71, 88] — only the array, nothing else.`;
     const indices = JSON.parse(match[0]);
     const results = indices.map(i => memes[i]).filter(Boolean).map(m => ({
       id: m.id, name: m.name, url: m.url,
-      imgflipUrl: `https://imgflip.com/memegenerator/${m.id}`
+      imgflipUrl: `https://imgflip.com/memegenerator/${m.id}`,
+      context: memeContext[m.name] || null
     }));
     res.json({ results });
   } catch (err) {
